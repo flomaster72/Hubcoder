@@ -3,15 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bento Grid QR Generator</title>
+  <title>A4 Bento Grid QR Generator</title>
   
+  <!-- html2pdf library for client-side PDF generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   
   <style>
     /* Base Page Styling */
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #f0f0f3;
+      background-color: #e2e2e5; /* Darker background to make the white A4 page pop */
       color: #333;
       display: flex;
       flex-direction: column;
@@ -42,7 +43,7 @@
       font-size: 16px;
       outline: none;
       flex: 1;
-      min-width: 150px;
+      min-width: 200px;
     }
     input:focus { border-color: #999; }
     
@@ -59,18 +60,21 @@
     }
     button:hover { background-color: #333; }
 
-    /* Minimal Bento Grid Container (The part that gets exported) */
-    #bento-export-area {
+    /* A4 Page Container */
+    #a4-export-area {
       background-color: #ffffff;
-      border-radius: 24px;
-      padding: 24px;
-      width: 600px;
+      width: 210mm;      /* Standard A4 Width */
+      min-height: 297mm; /* Standard A4 Height */
+      padding: 20mm;     /* Standard Page Margins */
       box-sizing: border-box;
-      /* Modern CSS Grid for layout */
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    /* Minimal Bento Grid layout inside the A4 Page */
+    .bento-row {
       display: grid;
-      grid-template-columns: 1fr 1.5fr;
+      grid-template-columns: auto 1fr; /* QR takes auto space, Text takes remaining */
       gap: 20px;
-      border: 1px solid #e5e5e5;
     }
 
     .bento-box {
@@ -79,75 +83,87 @@
       padding: 24px;
       display: flex;
       align-items: center;
-      justify-content: center;
       border: 1px solid #ededf0;
     }
 
+    /* Left Box: QR Code */
+    .bento-box-qr {
+      justify-content: center;
+    }
     .bento-box-qr img {
-      max-width: 100%;
+      width: 160px; /* Fixed size for QR */
+      height: 160px;
       border-radius: 12px;
     }
 
+    /* Right Box: Text */
     .bento-box-text {
-      font-size: 26px;
-      font-weight: 600;
-      line-height: 1.4;
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: 1px;
       color: #1c1c1e;
-      text-align: left;
-      align-items: flex-start;
-      padding: 30px 24px;
+      justify-content: flex-start;
+      padding-left: 40px;
     }
   </style>
 </head>
 <body>
 
+  <!-- Input Area for Live Updates -->
   <div class="controls">
-    <input type="text" id="qrInput" value="Z4-G83" placeholder="QR Code Data" oninput="updatePreview()">
-    <input type="text" id="textInput" value="Live (takes input)" placeholder="Live Text" oninput="updatePreview()">
-    <button onclick="downloadPDF()">Download PDF</button>
+    <!-- Single input to ensure the QR code and the text match exactly -->
+    <input type="text" id="sharedInput" value="Z4-G83" placeholder="Enter ID (e.g. Z4-G83)" oninput="updatePreview()">
+    <button onclick="downloadPDF()">Download A4 PDF</button>
   </div>
 
-  <div id="bento-export-area">
-    <div class="bento-box bento-box-qr">
-      <img id="qrImage" src="https://quickchart.io/qr?text=Z4-G83&size=200&margin=1" alt="QR Code" crossorigin="anonymous">
+  <!-- A4 Output Area -->
+  <div id="a4-export-area">
+    
+    <div class="bento-row">
+      <!-- Left Side: QR -->
+      <div class="bento-box bento-box-qr">
+        <img id="qrImage" src="https://quickchart.io/qr?text=Z4-G83&size=200&margin=1" alt="QR Code" crossorigin="anonymous">
+      </div>
+      
+      <!-- Beside it (Right Side): Same Text -->
+      <div class="bento-box bento-box-text" id="liveTextDisplay">
+        Z4-G83
+      </div>
     </div>
-    <div class="bento-box bento-box-text" id="liveTextDisplay">
-      Live (takes input)
-    </div>
+
   </div>
 
   <script>
     /**
-     * Reads the inputs and updates the DOM in real-time.
+     * Reads the single input and updates BOTH the QR code and the text.
      */
     function updatePreview() {
-      const qrData = document.getElementById('qrInput').value || ' ';
-      const textData = document.getElementById('textInput').value || ' ';
+      const data = document.getElementById('sharedInput').value || ' ';
       
       // Update the text box
-      document.getElementById('liveTextDisplay').innerText = textData;
+      document.getElementById('liveTextDisplay').innerText = data;
       
-      // Update the QR Code image source dynamically
-      const qrUrl = "https://quickchart.io/qr?text=" + encodeURIComponent(qrData) + "&size=200&margin=1";
+      // Update the QR Code image dynamically
+      const qrUrl = "https://quickchart.io/qr?text=" + encodeURIComponent(data) + "&size=200&margin=1";
       document.getElementById('qrImage').src = qrUrl;
     }
 
     /**
-     * Converts the HTML bento grid into a downloadable PDF.
+     * Converts the A4 div into a downloadable PDF.
      */
     function downloadPDF() {
-      const element = document.getElementById('bento-export-area');
+      const element = document.getElementById('a4-export-area');
       
-      // Configuration for the PDF export
+      // Configuration for the A4 PDF export
       const opt = {
-        margin:       0.5,
-        filename:     'Bento_Grid_Export.pdf',
+        margin:       0, // Margins are handled by CSS padding inside the element
+        filename:     'Bento_A4_Export.pdf',
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true }, // useCORS is required to fetch the QR image
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+        html2canvas:  { scale: 2, useCORS: true },
+        // Set format to 'a4' and orientation to 'portrait'
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      // Trigger the download via html2pdf library
       html2pdf().set(opt).from(element).save();
     }
   </script>

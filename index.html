@@ -5,14 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>A4 Bento Grid QR Generator</title>
   
-  <!-- html2pdf library for client-side PDF generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   
   <style>
     /* Base Page Styling */
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #e2e2e5; /* Darker background to make the white A4 page pop */
+      background-color: #e2e2e5;
       color: #333;
       display: flex;
       flex-direction: column;
@@ -24,19 +23,35 @@
     /* Live Input Controls */
     .controls {
       background: #ffffff;
-      padding: 20px;
+      padding: 24px;
       border-radius: 16px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.05);
       margin-bottom: 40px;
       display: flex;
-      gap: 15px;
-      flex-wrap: wrap;
-      justify-content: center;
+      flex-direction: column;
+      gap: 20px;
       width: 100%;
       max-width: 600px;
       box-sizing: border-box;
     }
-    input {
+    
+    .input-row {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      background: #f9f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #ededf0;
+    }
+
+    input[type="text"] {
       padding: 12px 16px;
       border: 1px solid #e5e5e5;
       border-radius: 8px;
@@ -45,7 +60,19 @@
       flex: 1;
       min-width: 200px;
     }
-    input:focus { border-color: #999; }
+    input[type="text"]:focus { border-color: #999; }
+
+    input[type="range"] {
+      flex: 1;
+      cursor: pointer;
+    }
+
+    .slider-label {
+      font-weight: 600;
+      font-size: 14px;
+      color: #555;
+      min-width: 80px;
+    }
     
     button {
       padding: 12px 24px;
@@ -57,15 +84,16 @@
       font-weight: 600;
       cursor: pointer;
       transition: background 0.2s;
+      white-space: nowrap;
     }
     button:hover { background-color: #333; }
 
     /* A4 Page Container */
     #a4-export-area {
       background-color: #ffffff;
-      width: 210mm;      /* Standard A4 Width */
-      min-height: 297mm; /* Standard A4 Height */
-      padding: 20mm;     /* Standard Page Margins */
+      width: 210mm;
+      min-height: 297mm;
+      padding: 20mm;
       box-sizing: border-box;
       box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     }
@@ -73,7 +101,7 @@
     /* Minimal Bento Grid layout inside the A4 Page */
     .bento-row {
       display: grid;
-      grid-template-columns: auto 1fr; /* QR takes auto space, Text takes remaining */
+      grid-template-columns: auto 1fr;
       gap: 20px;
     }
 
@@ -84,6 +112,7 @@
       display: flex;
       align-items: center;
       border: 1px solid #ededf0;
+      transition: all 0.2s ease-out; /* Smooth resizing */
     }
 
     /* Left Box: QR Code */
@@ -91,9 +120,10 @@
       justify-content: center;
     }
     .bento-box-qr img {
-      width: 160px; /* Fixed size for QR */
+      width: 160px; /* Default size, overridden by JS */
       height: 160px;
       border-radius: 12px;
+      transition: width 0.2s, height 0.2s;
     }
 
     /* Right Box: Text */
@@ -109,43 +139,56 @@
 </head>
 <body>
 
-  <!-- Input Area for Live Updates -->
   <div class="controls">
-    <!-- Single input to ensure the QR code and the text match exactly -->
-    <input type="text" id="sharedInput" value="Z4-G83" placeholder="Enter ID (e.g. Z4-G83)" oninput="updatePreview()">
-    <button onclick="downloadPDF()">Download A4 PDF</button>
+    <div class="input-row">
+      <input type="text" id="sharedInput" value="Z4-G83" placeholder="Enter ID (e.g. Z4-G83)" oninput="updatePreview()">
+      <button onclick="downloadPDF()">Download A4 PDF</button>
+    </div>
+    
+    <div class="slider-row">
+      <span class="slider-label">QR Size:</span>
+      <input type="range" id="qrScale" min="100" max="400" value="160" oninput="updatePreview()">
+      <span class="slider-label" id="scaleValueDisplay">160px</span>
+    </div>
   </div>
 
-  <!-- A4 Output Area -->
   <div id="a4-export-area">
-    
     <div class="bento-row">
-      <!-- Left Side: QR -->
       <div class="bento-box bento-box-qr">
         <img id="qrImage" src="https://quickchart.io/qr?text=Z4-G83&size=200&margin=1" alt="QR Code" crossorigin="anonymous">
       </div>
       
-      <!-- Beside it (Right Side): Same Text -->
       <div class="bento-box bento-box-text" id="liveTextDisplay">
         Z4-G83
       </div>
     </div>
-
   </div>
 
   <script>
     /**
-     * Reads the single input and updates BOTH the QR code and the text.
+     * Reads the inputs and updates the Text, QR data, and QR scale.
      */
     function updatePreview() {
       const data = document.getElementById('sharedInput').value || ' ';
+      const sizeStr = document.getElementById('qrScale').value;
+      const sizeInt = parseInt(sizeStr);
       
-      // Update the text box
+      // 1. Update the text display
       document.getElementById('liveTextDisplay').innerText = data;
       
-      // Update the QR Code image dynamically
-      const qrUrl = "https://quickchart.io/qr?text=" + encodeURIComponent(data) + "&size=200&margin=1";
-      document.getElementById('qrImage').src = qrUrl;
+      // 2. Update the visual size of the image on the screen
+      const qrImg = document.getElementById('qrImage');
+      qrImg.style.width = sizeStr + 'px';
+      qrImg.style.height = sizeStr + 'px';
+      
+      // 3. Update the slider label
+      document.getElementById('scaleValueDisplay').innerText = sizeStr + 'px';
+      
+      // 4. Update the actual image requested from the API
+      // We request an image slightly larger than the display size so it stays crisp when printed to PDF
+      const apiResolution = Math.max(200, sizeInt + 100); 
+      const qrUrl = "https://quickchart.io/qr?text=" + encodeURIComponent(data) + "&size=" + apiResolution + "&margin=1";
+      qrImg.src = qrUrl;
     }
 
     /**
@@ -154,13 +197,11 @@
     function downloadPDF() {
       const element = document.getElementById('a4-export-area');
       
-      // Configuration for the A4 PDF export
       const opt = {
-        margin:       0, // Margins are handled by CSS padding inside the element
+        margin:       0, 
         filename:     'Bento_A4_Export.pdf',
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2, useCORS: true },
-        // Set format to 'a4' and orientation to 'portrait'
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
